@@ -16,10 +16,10 @@ python GIDC_main.py
 
 This loads `data.mat`, runs the optimization, pops up matplotlib figures every 100 steps, and writes BMPs to `./results/`.
 
-### Environment (pinned, old)
-- python 3.6
-- **tensorflow 1.9** (TF1.x graph/session API — `tf.placeholder`, `tf.Session`, `tf.variable_scope`; not TF2-compatible)
-- numpy 1.18.1, matplotlib 3.1.3, pillow 7.1.2
+### Environment
+- python 3.6+
+- **pytorch 1.7+** (uses `nn.Module`, autograd, `torch.optim.Adam`; runs on CPU or CUDA — the script auto-selects via `torch.cuda.is_available()`)
+- numpy, scipy, matplotlib, pillow
 
 ## Architecture
 
@@ -29,10 +29,10 @@ Forward model: `y = A x`, where `A` = known illumination patterns, `y` = known s
 
 Two files:
 
-- [GIDC_main.py](GIDC_main.py) — driver. Loads data, computes a **DGI** (Differential Ghost Imaging) reconstruction analytically (the loop at lines 59-68), uses that DGI result as the network *input* `inpt`, builds the loss/optimizer, and runs the optimization loop.
-- [GIDC_model_Unet.py](GIDC_model_Unet.py) — `inference()` defines a U-Net (encoder conv0–conv5 with stride-2 poolings, decoder conv6–conv10 with transpose-convs + skip-concats) producing `out_x` (sigmoid image), then re-applies the **physical measurement model** in the `measurement` scope: it convolves `out_x` with the patterns `A` to produce `out_y`. So the network outputs both the image estimate and its predicted measurements.
+- [GIDC_main.py](GIDC_main.py) — driver. Loads data, computes a **DGI** (Differential Ghost Imaging) reconstruction analytically (the loop at lines ~53-68), uses that DGI result as the network *input* `inpt`, builds the loss/optimizer, and runs the optimization loop.
+- [GIDC_model_Unet.py](GIDC_model_Unet.py) — `GIDCUNet` (a `torch.nn.Module`). The U-Net (encoder `conv0`–`conv5` with stride-2 down-sampling, decoder `up6`–`conv10` with transpose-convs + skip-concats) produces `out_x` (sigmoid image). Its `forward` then re-applies the **physical measurement model**: it convolves `out_x` with the patterns (`F.conv2d`, full-image cross-correlation) to produce `out_y`. So the network outputs both the image estimate and its predicted measurements.
 
-Loss = `mean((y - out_y)^2)` + a tiny total-variation regularizer on `out_x` (`TV_strength`). Only `out_y` vs. measured `y` drives learning — the image `out_x` is constrained only indirectly through the physics and the TV term.
+Loss = `mse(y, out_y)` + a tiny total-variation regularizer on `out_x` (`TV_strength`). Only `out_y` vs. measured `y` drives learning — the image `out_x` is constrained only indirectly through the physics and the TV term.
 
 ### Data flow
 1. `data.mat` provides `patterns` (`64×64×N`) and `measurements` (`N`).
@@ -48,6 +48,7 @@ Loss = `mean((y - out_y)^2)` + a tiny total-variation regularizer on `out_x` (`T
 
 ## Gotchas
 
-- Reshapes use Fortran order (`order='F'`) when moving between the network's tensor layout and display/save — preserve this when touching reshape/transpose code or the image will be scrambled/transposed.
-- Commented-out lines (e.g. `DGI = np.transpose(DGI)` at line 105, alternate normalizations in the model's `measurement` scope) are documented alternatives the authors note "sometimes give better results" — leave them as hints, don't delete.
+- Display/save orientation: the network works in NCHW and the image is transposed (`.T`) before plotting/saving to reproduce the original TF code's Fortran-order reshape (for a square image, a C-order flatten reshaped Fortran-order equals a transpose). Keep `out_x` and `patterns` in the same `[W, H]` spatial layout or the measurement correlation breaks.
+- Commented-out lines (e.g. `DGI = DGI.T`, the alternate `# DGI[DGI<0] = 0`) are documented alternatives the authors note "sometimes give better results" — leave them as hints, don't delete.
 - `plt.show()` blocks; the loop only advances after each figure window is closed.
+- BatchNorm stays in train mode for the whole run (`model.train()`), matching the original which always fed `isTrain=True` — do not switch to `eval()` for the periodic readouts.
