@@ -1,6 +1,6 @@
 # GIDC
 
-Tensorflow implementation of paper: [Far-field super-resolution ghost imaging with a deep neural network constraint.](https://www.nature.com/articles/s41377-021-00680-w). One of the experiment data was provided.
+PyTorch implementation of paper: [Far-field super-resolution ghost imaging with a deep neural network constraint.](https://www.nature.com/articles/s41377-021-00680-w). One of the experiment data was provided.
 
 ## Citation
 If you find this project useful, we would be grateful if you cite the **GIDC paper：**
@@ -16,15 +16,17 @@ Ghost imaging (GI) facilitates image acquisition under low-light conditions by s
 ## How to use
 **Step 1: Configuring required packages**
 
-python 3.6
+python 3.6+
 
-tensorflow 1.9
+pytorch 1.7+
 
-matplotlib 3.1.3
+matplotlib
 
-numpy 1.18.1
+numpy
 
-pillow 7.1.2
+scipy
+
+pillow
 
 **Step 2: Run GIDC_main.py after download and extract the ZIP file.**
 
